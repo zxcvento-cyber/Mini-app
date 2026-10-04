@@ -3,226 +3,418 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Бронирование поездок</title>
-  <!-- VK Bridge SDK -->
+  <title>Поездки Абакан ⇄ Томск</title>
   <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
   <style>
+    :root {
+      --primary: #2688eb;
+      --bg: #ebedf0;
+      --card-bg: #ffffff;
+      --text: #000000;
+      --text-sub: #818c99;
+      --green: #4bb34b;
+      --red: #e64646;
+    }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      margin: 0; padding: 16px; background-color: var(--vkui--color_background, #f5f5f5);
-      color: var(--vkui--color_text_primary, #000);
+      font-family: -apple-system, BlinkMacSystemFont, 'Roboto', 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 14px;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-tap-highlight-color: transparent;
     }
-    .header { text-align: center; margin-bottom: 20px; }
-    .nav-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .header {
+      text-align: center;
+      margin-bottom: 14px;
+    }
+    .header h2 {
+      margin: 0 0 4px 0;
+      font-size: 20px;
+    }
+    .header p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--text-sub);
+    }
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
     .tab-btn {
-      flex: 1; padding: 10px; border: none; border-radius: 8px;
-      background: #e1e3e6; font-weight: 600; cursor: pointer;
+      flex: 1;
+      padding: 12px 6px;
+      border: none;
+      border-radius: 10px;
+      background: #dce1e6;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
     }
-    .tab-btn.active { background: #2688eb; color: #fff; }
-    .calendar { background: #fff; border-radius: 12px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; }
-    .day-header { font-size: 12px; color: #818c99; padding-bottom: 8px; font-weight: bold; }
+    .tab-btn.active {
+      background: var(--primary);
+      color: #fff;
+    }
+    .calendar-container {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .month-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-weight: 700;
+      font-size: 16px;
+    }
+    .weekdays-row {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-sub);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+    }
     .day-cell {
-      aspect-ratio: 1; display: flex; flex-direction: column; justify-content: center;
-      align-items: center; border-radius: 8px; border: 1px solid #ebedf0; font-size: 14px;
-      cursor: pointer; position: relative;
+      aspect-ratio: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #f7f8fa;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      position: relative;
+      border: 1px solid transparent;
+      user-select: none;
     }
-    .day-cell.inactive { opacity: 0.3; cursor: not-allowed; }
-    .day-cell.has-seats { background: #e8f9e8; border-color: #4bb34b; font-weight: bold; }
-    .day-cell.full { background: #ffebeb; border-color: #e64646; color: #e64646; }
-    .day-cell .badge { font-size: 9px; margin-top: 2px; color: #4bb34b; }
-    
-    /* Форма бронирования */
-    #booking-modal {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-      align-items: flex-end; justify-content: center;
+    .day-cell.empty {
+      background: transparent;
+      cursor: default;
     }
-    .modal-content {
-      background: #fff; width: 100%; border-radius: 16px 16px 0 0; padding: 20px; box-sizing: border-box;
+    .day-cell.has-ride {
+      background: #eaf7ea;
+      border-color: #a3e2a3;
+      color: #1b631b;
+      font-weight: 700;
     }
-    input, select, button.submit-btn {
-      width: 100%; padding: 12px; margin-top: 8px; margin-bottom: 12px;
-      border: 1px solid #dce1e6; border-radius: 8px; box-sizing: border-box; font-size: 15px;
+    .day-cell .dot {
+      width: 4px;
+      height: 4px;
+      background: var(--green);
+      border-radius: 50%;
+      margin-top: 2px;
     }
-    button.submit-btn { background: #2688eb; color: #fff; border: none; font-weight: bold; }
+    .day-cell.selected {
+      border: 2px solid var(--primary);
+      background: #e5f1ff;
+    }
+    .rides-list {
+      margin-top: 14px;
+    }
+    .ride-card {
+      background: #f2f7fc;
+      border-left: 4px solid var(--primary);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .ride-card h4 {
+      margin: 0 0 4px 0;
+      font-size: 15px;
+    }
+    .ride-card p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+    .book-btn-mini {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    /* Модальное окно */
+    #modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-box {
+      background: #fff;
+      width: 100%;
+      max-width: 480px;
+      border-radius: 20px 20px 0 0;
+      padding: 20px;
+      box-sizing: border-box;
+      animation: slideUp 0.25s ease-out;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .form-group {
+      margin-bottom: 12px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      color: var(--text-sub);
+      margin-bottom: 4px;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #dce1e6;
+      border-radius: 10px;
+      box-sizing: border-box;
+      font-size: 15px;
+      outline: none;
+    }
+    .btn-submit {
+      width: 100%;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 14px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .btn-cancel {
+      width: 100%;
+      background: none;
+      border: none;
+      padding: 12px;
+      color: var(--text-sub);
+      font-size: 14px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
 
   <div class="header">
-    <h3 style="margin: 0;">Поездки Абакан ⇄ Томск</h3>
+    <h2>Поездки Абакан ⇄ Томск</h2>
+    <p>Выберите дату и забронируйте место онлайн</p>
   </div>
 
   <div class="nav-tabs">
-    <button class="tab-btn active" id="btn-abk-tsk" onclick="setDirection('Абакан → Томск')">В Томск</button>
-    <button class="tab-btn" id="btn-tsk-abk" onclick="setDirection('Томск → Абакан')">В Абакан</button>
+    <button class="tab-btn active" id="btn-abk" onclick="changeDirection('Абакан → Томск')">Абакан ➔ Томск</button>
+    <button class="tab-btn" id="btn-tsk" onclick="changeDirection('Томск → Абакан')">Томск ➔ Абакан</button>
   </div>
 
-  <div class="calendar">
-    <h4 id="month-title" style="text-align: center; margin-top: 0;">Октябрь 2026</h4>
-    <div class="grid" id="calendar-grid">
-      <!-- Генерируется скриптом -->
+  <div class="calendar-container">
+    <div class="month-header">
+      <span id="month-label">Октябрь 2026</span>
     </div>
+
+    <div class="weekdays-row">
+      <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
+    </div>
+
+    <div class="grid" id="grid"></div>
   </div>
 
-  <!-- Всплывающая шторка бронирования -->
-  <div id="booking-modal">
-    <div class="modal-content">
-      <h3 id="modal-title" style="margin-top: 0;">Оформление поездки</h3>
-      <p id="modal-desc" style="color: #656565; font-size: 14px;"></p>
-      
-      <label>Количество мест:</label>
-      <select id="book-seats">
-        <option value="1">1 место</option>
-        <option value="2">2 места</option>
-        <option value="3">3 места</option>
-      </select>
+  <div class="rides-list" id="rides-container"></div>
 
-      <label>Багаж:</label>
-      <select id="book-baggage">
-        <option value="Ручная кладь">Ручная кладь / Рюкзак</option>
-        <option value="1 чемодан">1 чемодан / сумка</option>
-        <option value="Крупный багаж">2+ сумки или негабарит</option>
-      </select>
+  <!-- Модалка бронирования -->
+  <div id="modal">
+    <div class="modal-box">
+      <h3 style="margin-top: 0; margin-bottom: 6px;" id="modal-title">Оформление поездки</h3>
+      <p style="margin-top: 0; font-size: 13px; color: var(--text-sub);" id="modal-sub"></p>
 
-      <label>Телефон для связи:</label>
-      <input type="tel" id="book-phone" placeholder="+7 999 000-00-00">
+      <div class="form-group">
+        <label>Количество мест:</label>
+        <select id="input-seats">
+          <option value="1">1 пассажирское место</option>
+          <option value="2">2 места</option>
+          <option value="3">3 места</option>
+        </select>
+      </div>
 
-      <button class="submit-btn" onclick="submitBooking()">Подтвердить бронь</button>
-      <button onclick="closeModal()" style="width: 100%; border: none; background: none; color: #818c99;">Отмена</button>
+      <div class="form-group">
+        <label>Багаж:</label>
+        <select id="input-bag">
+          <option value="Маленький">Рюкзак / Ручная кладь</option>
+          <option value="Чемодан">Стандартный чемодан</option>
+          <option value="Большой">Много багажа / Сноуборд / Коробки</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Номер телефона для связи:</label>
+        <input type="tel" id="input-phone" placeholder="+7 999 000-00-00">
+      </div>
+
+      <button class="btn-submit" onclick="confirmBooking()">Подтвердить бронь</button>
+      <button class="btn-cancel" onclick="closeModal()">Закрыть</button>
     </div>
   </div>
 
   <script>
-    vkBridge.send('VKWebAppInit');
-
-    const API_URL = "https://ВАШ_ДОМЕН_ИЛИ_IP:8000/api";
-    let currentDirection = "Абакан → Томск";
-    let ridesData = [];
-    let selectedRide = null;
-    let vkUserData = { id: 0, first_name: "Пассажир" };
-
-    // Получаем ID пользователя VK
-    vkBridge.send('VKWebAppGetUserInfo').then(data => {
-      vkUserData = data;
-    }).catch(e => console.log(e));
-
-    function setDirection(dir) {
-      currentDirection = dir;
-      document.getElementById('btn-abk-tsk').classList.toggle('active', dir === 'Абакан → Томск');
-      document.getElementById('btn-tsk-abk').classList.toggle('active', dir === 'Томск → Абакан');
-      loadRides();
+    if (window.vkBridge) {
+      vkBridge.send('VKWebAppInit');
     }
 
-    async function loadRides() {
-      try {
-        const res = await fetch(`${API_URL}/rides?direction=${encodeURIComponent(currentDirection)}`);
-        const data = await res.json();
-        ridesData = data.rides;
-        renderCalendar();
-      } catch (e) {
-        console.error("Ошибка загрузки:", e);
+    // Предварительно заданные рейсы по маршрутам
+    const schedule = [
+      { id: "R1", dir: "Абакан → Томск", day: 10, month: 9, year: 2026, dateStr: "10 октября", time: "19:00", seats: 3 },
+      { id: "R2", dir: "Томск → Абакан", day: 12, month: 9, year: 2026, dateStr: "12 октября", time: "08:00", seats: 4 }
+    ];
+
+    let currentDir = "Абакан → Томск";
+    let selectedDay = 10;
+    let selectedRide = schedule[0];
+
+    function changeDirection(dir) {
+      currentDir = dir;
+      document.getElementById('btn-abk').classList.toggle('active', dir === 'Абакан → Томск');
+      document.getElementById('btn-tsk').classList.toggle('active', dir === 'Томск → Абакан');
+      
+      const firstAvailable = schedule.find(s => s.dir === currentDir);
+      if (firstAvailable) {
+        selectedDay = firstAvailable.day;
+        selectedRide = firstAvailable;
+      } else {
+        selectedDay = null;
+        selectedRide = null;
       }
+      render();
     }
 
-    function renderCalendar() {
-      const grid = document.getElementById('calendar-grid');
+    function render() {
+      const grid = document.getElementById('grid');
       grid.innerHTML = '';
-      
-      const weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-      weekdays.forEach(day => {
-        grid.innerHTML += `<div class="day-header">${day}</div>`;
-      });
 
-      // Текущий месяц: 31 день (Октябрь 2026 начинается с четверга, сдвиг 3)
-      for (let i = 0; i < 3; i++) {
-        grid.innerHTML += `<div class="day-cell inactive"></div>`;
+      // Октябрь 2026: 1-е число — четверг (индекс 3, если 0 - Пн)
+      const offset = 3; 
+      const totalDays = 31;
+
+      for (let i = 0; i < offset; i++) {
+        const empty = document.createElement('div');
+        empty.className = 'day-cell empty';
+        grid.appendChild(empty);
       }
 
-      for (let day = 1; day <= 31; day++) {
-        const dayStr = day < 10 ? `0${day}` : `${day}`;
-        const fullDatePattern = `${dayStr}.10.2026`;
-        
-        // Ищем рейс на этот день
-        const ride = ridesData.find(r => r.date.includes(dayStr));
+      for (let d = 1; d <= totalDays; d++) {
+        const cell = document.createElement('div');
+        cell.className = 'day-cell';
+        cell.innerText = d;
 
-        if (ride) {
-          if (ride.free_seats > 0) {
-            grid.innerHTML += `
-              <div class="day-cell has-seats" onclick='openModal(${JSON.stringify(ride)})'>
-                ${day}
-                <span class="badge">${ride.free_seats} м.</span>
-              </div>`;
-          } else {
-            grid.innerHTML += `
-              <div class="day-cell full">
-                ${day}
-                <span class="badge" style="color:#e64646;">нет</span>
-              </div>`;
-          }
-        } else {
-          grid.innerHTML += `<div class="day-cell inactive">${day}</div>`;
+        const hasRide = schedule.some(s => s.dir === currentDir && s.day === d);
+        if (hasRide) {
+          cell.classList.add('has-ride');
+          const dot = document.createElement('div');
+          dot.className = 'dot';
+          cell.appendChild(dot);
         }
+
+        if (d === selectedDay) {
+          cell.classList.add('selected');
+        }
+
+        cell.onclick = () => {
+          selectedDay = d;
+          selectedRide = schedule.find(s => s.dir === currentDir && s.day === d) || null;
+          render();
+        };
+
+        grid.appendChild(cell);
+      }
+
+      // Отрисовка списка рейсов под календарем
+      const container = document.getElementById('rides-container');
+      container.innerHTML = '';
+
+      if (selectedRide) {
+        container.innerHTML = `
+          <div class="ride-card">
+            <div>
+              <h4>${selectedRide.dateStr}, выезд в ${selectedRide.time}</h4>
+              <p>Осталось свободных мест: <b>${selectedRide.seats}</b></p>
+            </div>
+            <button class="book-btn-mini" onclick="openModal()">Выбрать</button>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div class="ride-card" style="border-left-color: #818c99;">
+            <div>
+              <h4>На ${selectedDay} октября плановых рейсов нет</h4>
+              <p>Вы можете оставить заявку на эту дату</p>
+            </div>
+            <button class="book-btn-mini" style="background:#4bb34b;" onclick="openCustomModal(${selectedDay})">Оставить заявку</button>
+          </div>
+        `;
       }
     }
 
-    function openModal(ride) {
-      selectedRide = ride;
-      document.getElementById('modal-title').innerText = `${currentDirection}`;
-      document.getElementById('modal-desc').innerText = `Выезд: ${ride.date} в ${ride.time}. Доступно мест: ${ride.free_seats}`;
-      
-      // Настраиваем количество доступных к выбору мест
-      const select = document.getElementById('book-seats');
-      select.innerHTML = '';
-      for (let i = 1; i <= Math.min(ride.free_seats, 3); i++) {
-        select.innerHTML += `<option value="${i}">${i} мест(а)</option>`;
-      }
-      
-      document.getElementById('booking-modal').style.display = 'flex';
+    function openModal() {
+      document.getElementById('modal-title').innerText = currentDir;
+      document.getElementById('modal-sub').innerText = `Рейс: ${selectedRide.dateStr} в ${selectedRide.time}`;
+      document.getElementById('modal').style.display = 'flex';
+    }
+
+    function openCustomModal(day) {
+      selectedRide = { id: "CUSTOM", dateStr: `${day} октября (по запросу)`, time: "в течение дня" };
+      document.getElementById('modal-title').innerText = `Заявка на ${day} октября`;
+      document.getElementById('modal-sub').innerText = `Направление: ${currentDir}`;
+      document.getElementById('modal').style.display = 'flex';
     }
 
     function closeModal() {
-      document.getElementById('booking-modal').style.display = 'none';
+      document.getElementById('modal').style.display = 'none';
     }
 
-    async function submitBooking() {
-      const phone = document.getElementById('book-phone').value.trim();
-      const seats = parseInt(document.getElementById('book-seats').value);
-      const baggage = document.getElementById('book-baggage').value;
+    function confirmBooking() {
+      const phone = document.getElementById('input-phone').value.trim();
+      const seats = document.getElementById('input-seats').value;
+      const baggage = document.getElementById('input-bag').value;
 
-      if (!phone) {
-        alert("Пожалуйста, укажите номер телефона");
+      if (!phone || phone.length < 6) {
+        alert('Пожалуйста, введите ваш контактный номер телефона');
         return;
       }
 
-      const body = {
-        ride_id: selectedRide.id,
-        user_id: vkUserData.id,
-        name: `${vkUserData.first_name} ${vkUserData.last_name || ''}`.trim(),
-        phone: phone,
-        seats: seats,
-        baggage: baggage,
-        direction: currentDirection,
-        ride_date: `${selectedRide.date} ${selectedRide.time}`
-      };
+      const textMsg = `🚗 Заявка из календаря:\nРейс: ${selectedRide.dateStr} (${selectedRide.time})\nМаршрут: ${currentDir}\nМест: ${seats}\nБагаж: ${baggage}\nТел: ${phone}`;
+      
+      closeModal();
 
-      const res = await fetch(`${API_URL}/book`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-
-      if (res.ok) {
-        closeModal();
-        vkBridge.send("VKWebAppShowNativeAds", { ad_format: "reward" }).catch(() => {});
-        alert("Место успешно забронировано!");
-        vkBridge.send("VKWebAppClose", { status: "success" });
-      } else {
-        alert("Ошибка бронирования: возможно, места уже заняли");
+      if (window.vkBridge) {
+        // Закрываем окно мини-апа обратно в чат
+        vkBridge.send('VKWebAppClose', { status: 'success' });
       }
+      alert('Заявка сформирована! Напишите её в чат с ботом для подтверждения.');
     }
 
-    loadRides();
+    render();
   </script>
 </body>
 </html>
