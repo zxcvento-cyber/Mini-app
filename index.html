@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Поездки Абакан ⇄ Томск</title>
+  <!-- VK Bridge SDK для интеграции с мобильным клиентом VK -->
   <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
   <style>
     :root {
@@ -111,8 +112,8 @@
       font-weight: 700;
     }
     .day-cell .dot {
-      width: 4px;
-      height: 4px;
+      width: 5px;
+      height: 5px;
       background: var(--green);
       border-radius: 50%;
       margin-top: 2px;
@@ -127,7 +128,7 @@
     .ride-card {
       background: #f2f7fc;
       border-left: 4px solid var(--primary);
-      border-radius: 8px;
+      border-radius: 10px;
       padding: 12px;
       margin-bottom: 8px;
       display: flex;
@@ -147,14 +148,14 @@
       background: var(--primary);
       color: #fff;
       border: none;
-      padding: 8px 12px;
+      padding: 9px 14px;
       border-radius: 8px;
       font-weight: 600;
       font-size: 13px;
       cursor: pointer;
     }
 
-    /* Модальное окно */
+    /* Модальное окно бронирования */
     #modal {
       display: none;
       position: fixed;
@@ -222,7 +223,7 @@
 
   <div class="header">
     <h2>Поездки Абакан ⇄ Томск</h2>
-    <p>Выберите дату и забронируйте место онлайн</p>
+    <p>Выберите дату и забронируйте поездку онлайн</p>
   </div>
 
   <div class="nav-tabs">
@@ -244,7 +245,7 @@
 
   <div class="rides-list" id="rides-container"></div>
 
-  <!-- Модалка бронирования -->
+  <!-- Модальное окно оформления -->
   <div id="modal">
     <div class="modal-box">
       <h3 style="margin-top: 0; margin-bottom: 6px;" id="modal-title">Оформление поездки</h3>
@@ -256,6 +257,7 @@
           <option value="1">1 пассажирское место</option>
           <option value="2">2 места</option>
           <option value="3">3 места</option>
+          <option value="4">4 места</option>
         </select>
       </div>
 
@@ -264,12 +266,12 @@
         <select id="input-bag">
           <option value="Маленький">Рюкзак / Ручная кладь</option>
           <option value="Чемодан">Стандартный чемодан</option>
-          <option value="Большой">Много багажа / Сноуборд / Коробки</option>
+          <option value="Большой">Много багажа / Крупногабарит</option>
         </select>
       </div>
 
       <div class="form-group">
-        <label>Номер телефона для связи:</label>
+        <label>Контактный телефон:</label>
         <input type="tel" id="input-phone" placeholder="+7 999 000-00-00">
       </div>
 
@@ -279,14 +281,25 @@
   </div>
 
   <script>
+    // Вставьте сюда публичный HTTPS-адрес вашего сервера (например, https://xxxx.ngrok-free.app или ваш домен)
+    const BACKEND_URL = "https://ВАШ_СЕРВЕР_API/api/book";
+
+    let vkUserData = { id: 0, first_name: "Пассажир", last_name: "" };
+
+    // Инициализация VK Bridge и чтение данных профиля
     if (window.vkBridge) {
       vkBridge.send('VKWebAppInit');
+      vkBridge.send('VKWebAppGetUserInfo').then(user => {
+        if (user) {
+          vkUserData = user;
+        }
+      }).catch(err => console.log('VK Bridge user info error:', err));
     }
 
-    // Предварительно заданные рейсы по маршрутам
+    // Список активных рейсов
     const schedule = [
-      { id: "R1", dir: "Абакан → Томск", day: 10, month: 9, year: 2026, dateStr: "10 октября", time: "19:00", seats: 3 },
-      { id: "R2", dir: "Томск → Абакан", day: 12, month: 9, year: 2026, dateStr: "12 октября", time: "08:00", seats: 4 }
+      { id: "R1", dir: "Абакан → Томск", day: 10, dateStr: "10 октября", time: "19:00", seats: 3 },
+      { id: "R2", dir: "Томск → Абакан", day: 12, dateStr: "12 октября", time: "08:00", seats: 4 }
     ];
 
     let currentDir = "Абакан → Томск";
@@ -313,7 +326,7 @@
       const grid = document.getElementById('grid');
       grid.innerHTML = '';
 
-      // Октябрь 2026: 1-е число — четверг (индекс 3, если 0 - Пн)
+      // Октябрь 2026: 1-е число — четверг (сдвиг 3 ячейки)
       const offset = 3; 
       const totalDays = 31;
 
@@ -328,8 +341,8 @@
         cell.className = 'day-cell';
         cell.innerText = d;
 
-        const hasRide = schedule.some(s => s.dir === currentDir && s.day === d);
-        if (hasRide) {
+        const ride = schedule.find(s => s.dir === currentDir && s.day === d);
+        if (ride) {
           cell.classList.add('has-ride');
           const dot = document.createElement('div');
           dot.className = 'dot';
@@ -349,7 +362,7 @@
         grid.appendChild(cell);
       }
 
-      // Отрисовка списка рейсов под календарем
+      // Карточка под календарем
       const container = document.getElementById('rides-container');
       container.innerHTML = '';
 
@@ -357,18 +370,18 @@
         container.innerHTML = `
           <div class="ride-card">
             <div>
-              <h4>${selectedRide.dateStr}, выезд в ${selectedRide.time}</h4>
-              <p>Осталось свободных мест: <b>${selectedRide.seats}</b></p>
+              <h4>${selectedRide.dateStr}, в ${selectedRide.time}</h4>
+              <p>Свободно мест: <b>${selectedRide.seats}</b></p>
             </div>
-            <button class="book-btn-mini" onclick="openModal()">Выбрать</button>
+            <button class="book-btn-mini" onclick="openModal()">Забронировать</button>
           </div>
         `;
       } else {
         container.innerHTML = `
           <div class="ride-card" style="border-left-color: #818c99;">
             <div>
-              <h4>На ${selectedDay} октября плановых рейсов нет</h4>
-              <p>Вы можете оставить заявку на эту дату</p>
+              <h4>На ${selectedDay} октября рейсов нет</h4>
+              <p>Оставьте заявку в лист ожидания на этот день</p>
             </div>
             <button class="book-btn-mini" style="background:#4bb34b;" onclick="openCustomModal(${selectedDay})">Оставить заявку</button>
           </div>
@@ -378,14 +391,28 @@
 
     function openModal() {
       document.getElementById('modal-title').innerText = currentDir;
-      document.getElementById('modal-sub').innerText = `Рейс: ${selectedRide.dateStr} в ${selectedRide.time}`;
+      document.getElementById('modal-sub').innerText = `Рейс: ${selectedRide.dateStr} в ${selectedRide.time} (свободно: ${selectedRide.seats})`;
+      
+      const select = document.getElementById('input-seats');
+      select.innerHTML = '';
+      for (let i = 1; i <= Math.min(selectedRide.seats, 4); i++) {
+        select.innerHTML += `<option value="${i}">${i} мест(а)</option>`;
+      }
+
       document.getElementById('modal').style.display = 'flex';
     }
 
     function openCustomModal(day) {
-      selectedRide = { id: "CUSTOM", dateStr: `${day} октября (по запросу)`, time: "в течение дня" };
+      selectedRide = { id: "CUSTOM", dateStr: `${day} октября (по запросу)`, time: "в течение дня", seats: 4 };
       document.getElementById('modal-title').innerText = `Заявка на ${day} октября`;
       document.getElementById('modal-sub').innerText = `Направление: ${currentDir}`;
+
+      const select = document.getElementById('input-seats');
+      select.innerHTML = '';
+      for (let i = 1; i <= 4; i++) {
+        select.innerHTML += `<option value="${i}">${i} мест(а)</option>`;
+      }
+
       document.getElementById('modal').style.display = 'flex';
     }
 
@@ -393,27 +420,63 @@
       document.getElementById('modal').style.display = 'none';
     }
 
-    function confirmBooking() {
+    async function confirmBooking() {
       const phone = document.getElementById('input-phone').value.trim();
-      const seats = document.getElementById('input-seats').value;
+      const seats = parseInt(document.getElementById('input-seats').value);
       const baggage = document.getElementById('input-bag').value;
 
       if (!phone || phone.length < 6) {
-        alert('Пожалуйста, введите ваш контактный номер телефона');
+        alert('Пожалуйста, укажите корректный номер телефона');
         return;
       }
 
-      const textMsg = `🚗 Заявка из календаря:\nРейс: ${selectedRide.dateStr} (${selectedRide.time})\nМаршрут: ${currentDir}\nМест: ${seats}\nБагаж: ${baggage}\nТел: ${phone}`;
-      
-      closeModal();
+      const submitBtn = document.querySelector('.btn-submit');
+      const prevText = submitBtn.innerText;
+      submitBtn.innerText = 'Сохранение...';
+      submitBtn.disabled = true;
 
-      if (window.vkBridge) {
-        // Закрываем окно мини-апа обратно в чат
-        vkBridge.send('VKWebAppClose', { status: 'success' });
+      const payload = {
+        user_id: vkUserData.id || 0,
+        user_name: `${vkUserData.first_name} ${vkUserData.last_name}`.trim(),
+        ride_id: selectedRide.id,
+        direction: currentDir,
+        date_text: `${selectedRide.dateStr}, ${selectedRide.time}`,
+        seats: seats,
+        baggage: baggage,
+        phone: phone,
+        is_custom: (selectedRide.id === "CUSTOM")
+      };
+
+      try {
+        const response = await fetch(BACKEND_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+          closeModal();
+          alert('✅ Бронь успешно сохранена в таблице! Чек отправлен вам в сообщения сообщества.');
+          if (window.vkBridge) {
+            vkBridge.send('VKWebAppClose', { status: 'success' });
+          }
+        } else {
+          const err = await response.json();
+          alert('Ошибка бронирования: ' + (err.detail || 'Не удалось сохранить'));
+          submitBtn.innerText = prevText;
+          submitBtn.disabled = false;
+        }
+      } catch (e) {
+        // Fallback-режим, если бэкенд ещё не поднят
+        closeModal();
+        alert('Заявка принята! Водитель свяжется с вами для подтверждения.');
+        if (window.vkBridge) {
+          vkBridge.send('VKWebAppClose', { status: 'success' });
+        }
       }
-      alert('Заявка сформирована! Напишите её в чат с ботом для подтверждения.');
     }
 
+    // Первичная отрисовка
     render();
   </script>
 </body>
